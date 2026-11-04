@@ -17,12 +17,6 @@ public class UserController {
         this.userDetailsService = userDetailsService;
     }
 
-    @GetMapping("/users/search")
-    public ResponseEntity<List<UserResponse>> searchUsers(
-            @RequestParam(value = "query", required = false, defaultValue = "") String query) {
-        return ResponseEntity.ok(userDetailsService.searchUsers(query));
-    }
-
     @PostMapping("/register")
     public UserResponse createUser(@RequestBody User user) {
 
@@ -42,5 +36,11 @@ public class UserController {
             return ResponseEntity.ok(verification);
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserResponse>> searchUsers(@RequestParam("q") String query) {
+        List<UserResponse> users = userDetailsService.searchUsers(query);
+        return ResponseEntity.ok(users);
     }
 }

@@ -530,6 +530,8 @@ export default function GameDetails() {
           <SettlementSection
             preview={preview}
             settlement={settlement}
+            participants={participants}
+            chipConversionRate={game.chipConversionRate}
             isSettled={game.gameStatus === "SETTLED"}
             isManager={isManager}
             busy={busy}

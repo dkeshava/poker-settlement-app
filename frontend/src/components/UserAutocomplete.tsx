@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { searchUsers } from "../api/gameApi";
-import type { UserSummary } from "../types/game";
-import { SearchIcon, UserPlusIcon } from "./Icons";
-import { getInitials } from "../utils/formatters";
+import { UserPlusIcon, UserIcon } from "./Icons";
+
+interface UserOption {
+  id: number;
+  username: string;
+}
 
 interface UserAutocompleteProps {
   onSelect: (data: { userId?: number; username?: string }) => void;
@@ -16,119 +19,164 @@ export default function UserAutocomplete({
   disabled = false,
 }: UserAutocompleteProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<UserSummary[]>([]);
+  const [suggestions, setSuggestions] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const trimmed = query.trim();
+
+  // Close dropdown on outside click
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Debounced search when query >= 2 characters
+  useEffect(() => {
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setLoading(false);
+      setHasSearched(false);
+      setShowDropdown(false);
+      setSelectedUser(null);
       return;
+    }
+
+    // If user edited input away from selected user, reset selection
+    if (selectedUser && selectedUser.username.toLowerCase() !== trimmed.toLowerCase()) {
+      setSelectedUser(null);
     }
 
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const users = await searchUsers(query.trim());
-        setResults(users);
+        const results = await searchUsers(trimmed);
+        setSuggestions(results);
+        setHasSearched(true);
+        setShowDropdown(true);
+
+        // If the typed query is an exact match for one of the returned users, auto-select
+        const exactMatch = results.find(
+          (u) => u.username.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (exactMatch) {
+          setSelectedUser(exactMatch);
+        }
       } catch (err) {
         console.error("Failed to search users:", err);
+        setSuggestions([]);
+        setHasSearched(true);
+        setShowDropdown(true);
       } finally {
         setLoading(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [trimmed]);
 
-  // Close dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleSelectUser = (user: UserSummary) => {
-    onSelect({ userId: user.id, username: user.username });
-    setQuery("");
+  // Handle clicking a suggested user: fills input, sets selected user, closes dropdown
+  const handleSelectSuggestion = (user: UserOption) => {
+    setQuery(user.username);
+    setSelectedUser(user);
     setShowDropdown(false);
   };
 
+  // Submit action: enabled only when a verified user is selected
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || busy) return;
+    if (!selectedUser || busy || disabled) return;
 
-    // Check if entered input is numeric ID or username
-    const numericId = Number(query.trim());
-    if (Number.isInteger(numericId) && numericId > 0) {
-      onSelect({ userId: numericId });
-    } else {
-      onSelect({ username: query.trim() });
-    }
+    onSelect({
+      userId: selectedUser.id,
+      username: selectedUser.username,
+    });
+
     setQuery("");
+    setSelectedUser(null);
+    setSuggestions([]);
     setShowDropdown(false);
+    setHasSearched(false);
   };
 
+  const isAddDisabled = !selectedUser || busy || disabled;
+
   return (
-    <div className="user-autocomplete-wrap" ref={wrapperRef}>
+    <div className="user-autocomplete-wrap" ref={containerRef}>
       <form onSubmit={handleSubmit} className="autocomplete-form">
         <div className="search-input-box">
-          <SearchIcon size={16} className="search-icon" />
+          <UserIcon size={16} className="search-icon" />
           <input
             type="text"
             className="input search-input"
-            placeholder="Search username or enter ID (e.g. alex, 5)..."
+            placeholder="Search username (min 2 characters)..."
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowDropdown(true);
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => {
+              if (trimmed.length >= 2 && hasSearched) {
+                setShowDropdown(true);
+              }
             }}
-            onFocus={() => setShowDropdown(true)}
             disabled={disabled || busy}
+            autoComplete="off"
           />
-          {loading && <span className="search-spinner" />}
+          {loading && <div className="search-spinner" />}
         </div>
+
         <button
           type="submit"
-          className="btn btn-primary btn-add-user"
-          disabled={!query.trim() || busy || disabled}
+          className={`btn btn-primary btn-add-user ${isAddDisabled ? "btn-faded" : ""}`}
+          disabled={isAddDisabled}
+          title={isAddDisabled ? "Select a matching user from suggestions to add" : "Add player to game"}
         >
           <UserPlusIcon size={16} />
           <span>{busy ? "Adding…" : "Add Player"}</span>
         </button>
       </form>
 
-      {showDropdown && query.trim() && (
+      {/* Dropdown Suggestions */}
+      {showDropdown && !loading && (
         <div className="autocomplete-dropdown">
-          {results.length > 0 ? (
+          {suggestions.length > 0 ? (
             <div className="autocomplete-list">
-              {results.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  className="autocomplete-item"
-                  onClick={() => handleSelectUser(user)}
-                >
-                  <div className="item-avatar">{getInitials(user.username)}</div>
-                  <div className="item-info">
-                    <span className="item-username">{user.username}</span>
-                    <span className="item-id">ID: #{user.id}</span>
-                  </div>
-                  <span className="item-action">Select</span>
-                </button>
-              ))}
+              {suggestions.map((u) => {
+                const isSelected = selectedUser?.id === u.id;
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className={`autocomplete-item ${isSelected ? "autocomplete-item-active" : ""}`}
+                    onClick={() => handleSelectSuggestion(u)}
+                  >
+                    <div className="item-avatar">
+                      {u.username.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="item-info">
+                      <span className="item-username">{u.username}</span>
+                      <span className="item-id">ID: #{u.id}</span>
+                    </div>
+                    <span className="item-action">
+                      {isSelected ? "Selected ✓" : "Select"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          ) : !loading ? (
-            <div className="autocomplete-empty">
-              <p>No existing users found matching "{query}".</p>
-              <small>Click "Add Player" to submit as username directly.</small>
-            </div>
-          ) : null}
+          ) : (
+            hasSearched && (
+              <div className="autocomplete-empty">
+                No user matching "{trimmed}"
+              </div>
+            )
+          )}
         </div>
       )}
     </div>

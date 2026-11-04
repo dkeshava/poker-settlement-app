@@ -1,5 +1,6 @@
 package com.dk.pokersettlement.services;
 
+import com.dk.pokersettlement.dtos.UserResponse;
 import com.dk.pokersettlement.models.User;
 import com.dk.pokersettlement.repositories.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class UserService {
@@ -36,16 +39,13 @@ public class UserService {
         return "failure";
     }
 
-    public java.util.List<com.dk.pokersettlement.dtos.UserResponse> searchUsers(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            return userRepo.findAll().stream()
-                    .limit(20)
-                    .map(u -> new com.dk.pokersettlement.dtos.UserResponse(u.getId(), u.getUsername()))
-                    .toList();
+    public List<UserResponse> searchUsers(String query) {
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
         }
-        return userRepo.findByUsernameContainingIgnoreCase(query.trim()).stream()
-                .limit(20)
-                .map(u -> new com.dk.pokersettlement.dtos.UserResponse(u.getId(), u.getUsername()))
+        return userRepo.findTop10ByUsernameContainingIgnoreCase(query.trim())
+                .stream()
+                .map(u -> new UserResponse(u.getId(), u.getUsername()))
                 .toList();
     }
 }

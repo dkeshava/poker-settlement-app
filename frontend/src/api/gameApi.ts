@@ -1,5 +1,5 @@
 import axios from "./axiosInstance";
-import type { BuyIn, Game, Participant, Settlement, SettlementPreview, UserSummary } from "../types/game";
+import type { BuyIn, Game, Participant, Settlement, SettlementPreview } from "../types/game";
 
 export const getGames = () => axios.get<Game[]>("/games").then(r => r.data);
 
@@ -18,9 +18,6 @@ export const addParticipant = (gameId: string | number, data: { userId?: number;
 
 export const removeParticipant = (gameId: string | number, participantId: number) =>
   axios.post(`/games/${gameId}/participants/${participantId}`);
-
-export const searchUsers = (query: string = "") =>
-  axios.get<UserSummary[]>(`/users/search?query=${encodeURIComponent(query)}`).then(r => r.data);
 
 export const addBuyIn = (gameId: string | number, participantId: number, chipValue: number) =>
   axios.post<BuyIn>(`/games/${gameId}/participants/${participantId}/`, { chipValue }).then(r => r.data);
@@ -51,3 +48,6 @@ export const finalizeSettlement = (id: string | number) =>
 
 export const getSettlement = (id: string | number) =>
   axios.get<Settlement>(`/games/${id}/settlement`).then(r => r.data);
+
+export const searchUsers = (query: string) =>
+  axios.get<{ id: number; username: string }[]>("/users/search", { params: { q: query } }).then(r => r.data);

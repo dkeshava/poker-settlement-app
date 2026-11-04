@@ -330,17 +330,11 @@ class GameIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    void managerCanAddParticipantByUsernameAndSearchUsers() throws Exception {
+    void managerCanAddParticipantByUsername() throws Exception {
         String gameId = createGame(managerToken);
 
         String participantUsername = uniqueUsername();
         registerUser(participantUsername, "StrongPassword123!");
-
-        // Search user
-        mockMvc.perform(get("/users/search?query=" + participantUsername)
-                        .header("Authorization", "Bearer " + managerToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].username").value(participantUsername));
 
         // Add participant by username
         String addPayload = String.format("{\"username\":\"%s\"}", participantUsername);

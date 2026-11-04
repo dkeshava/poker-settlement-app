@@ -92,15 +92,22 @@ public class ParticipantService {
 
         // 4. Find the user to add
         User user;
-        if (request.getUserId() != null) {
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            String uname = request.getUsername().trim();
+            user = userRepo.findByUsernameIgnoreCase(uname)
+                    .or(() -> userRepo.findOptionalByUsername(uname))
+                    .or(() -> {
+                        if (uname.matches("^\\d+$")) {
+                            return userRepo.findById(Long.valueOf(uname));
+                        }
+                        return java.util.Optional.empty();
+                    })
+                    .orElseThrow(() ->
+                            new EntityNotFoundException("User not found with username: " + uname));
+        } else if (request.getUserId() != null) {
             user = userRepo.findById(request.getUserId())
                     .orElseThrow(() ->
                             new EntityNotFoundException("User not found with ID: " + request.getUserId()));
-        } else if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
-            user = userRepo.findByUsernameIgnoreCase(request.getUsername().trim())
-                    .or(() -> userRepo.findOptionalByUsername(request.getUsername().trim()))
-                    .orElseThrow(() ->
-                            new EntityNotFoundException("User not found with username: " + request.getUsername()));
         } else {
             throw new IllegalArgumentException("Either userId or username must be provided");
         }
