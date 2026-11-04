@@ -1,0 +1,8 @@
+spring.application.name=poker-settlement
+
+# Copy this file to application.properties and set local credentials.
+spring.datasource.url=jdbc:postgresql://localhost:5432/pokersettlement
+spring.datasource.username=your_database_username
+spring.datasource.password=your_database_password
+
+spring.jpa.hibernate.ddl-auto=update
