@@ -35,4 +35,17 @@ public class UserService {
         }
         return "failure";
     }
+
+    public java.util.List<com.dk.pokersettlement.dtos.UserResponse> searchUsers(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return userRepo.findAll().stream()
+                    .limit(20)
+                    .map(u -> new com.dk.pokersettlement.dtos.UserResponse(u.getId(), u.getUsername()))
+                    .toList();
+        }
+        return userRepo.findByUsernameContainingIgnoreCase(query.trim()).stream()
+                .limit(20)
+                .map(u -> new com.dk.pokersettlement.dtos.UserResponse(u.getId(), u.getUsername()))
+                .toList();
+    }
 }

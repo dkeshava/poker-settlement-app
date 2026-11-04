@@ -43,8 +43,36 @@ public class GameService {
         game.setRoundActive(false);
         game.setCreatedBy(currentUserService.getCurrentUser());
         game.setChipConversionRate(gameRequest.getChipConversionRate());
+        if (gameRequest.getName() != null && !gameRequest.getName().trim().isEmpty()) {
+            game.setName(gameRequest.getName().trim());
+        } else {
+            game.setName("Poker Session");
+        }
 
         return gameRepo.save(game);
+    }
+
+    @Transactional
+    public void deleteGame(Long gameId) throws AccessDeniedException {
+        Game game = getGameForManager(gameId);
+
+        if (game.getGameStatus() == GameState.SETTLED) {
+            throw new IllegalStateException("Settled games cannot be deleted");
+        }
+
+        List<GameParticipant> participants = gameParticipantRepo.findByGame_Id(gameId);
+        if (!participants.isEmpty()) {
+            List<Long> participantIds = participants.stream()
+                    .map(GameParticipant::getId)
+                    .toList();
+            List<com.dk.pokersettlement.models.BuyIn> buyIns = buyInRepo.findByParticipantIdIn(participantIds);
+            if (!buyIns.isEmpty()) {
+                buyInRepo.deleteAll(buyIns);
+            }
+            gameParticipantRepo.deleteAll(participants);
+        }
+
+        gameRepo.delete(game);
     }
 
     public Game getGame(Long gameId) throws AccessDeniedException {

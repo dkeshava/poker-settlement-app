@@ -5,15 +5,22 @@ import com.dk.pokersettlement.models.User;
 import com.dk.pokersettlement.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
+@CrossOrigin
 public class UserController {
     UserService userDetailsService;
     public UserController(UserService userDetailsService) {
         this.userDetailsService = userDetailsService;
+    }
+
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserResponse>> searchUsers(
+            @RequestParam(value = "query", required = false, defaultValue = "") String query) {
+        return ResponseEntity.ok(userDetailsService.searchUsers(query));
     }
 
     @PostMapping("/register")

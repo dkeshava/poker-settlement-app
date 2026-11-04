@@ -8,5 +8,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class AddParticipantRequest {
-    Long userId;
+    private Long userId;
+    private String username;
+
+    public AddParticipantRequest(Long userId) {
+        this.userId = userId;
+    }
 }

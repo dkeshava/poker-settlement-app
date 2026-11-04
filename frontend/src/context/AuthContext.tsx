@@ -8,7 +8,8 @@ import {
 import type {
     LoginRequest,
     RegisterRequest,
-    AuthContextType
+    AuthContextType,
+    User
 } from "../types/auth";
 
 import { loginUser, registerUser } from "../api/authApi";
@@ -25,8 +26,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         () => !!localStorage.getItem("token")
     );
 
-    const login = async (credentials: LoginRequest) => {
+    const [username, setUsername] = useState<string | null>(
+        () => localStorage.getItem("poker_username")
+    );
 
+    const login = async (credentials: LoginRequest) => {
         const token = await loginUser(credentials);
 
         if (!token.trim()) {
@@ -34,15 +38,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
 
         localStorage.setItem("token", token.trim());
+        localStorage.setItem("poker_username", credentials.username);
+        setUsername(credentials.username);
         setIsAuthenticated(true);
     };
 
-    const register = async (details: RegisterRequest) => {
+    const register = async (details: RegisterRequest): Promise<User> => {
         return await registerUser(details);
     };
 
     const logout = () => {
         localStorage.removeItem("token");
+        localStorage.removeItem("poker_username");
+        setUsername(null);
         setIsAuthenticated(false);
     };
 
@@ -50,6 +58,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         <AuthContext.Provider
             value={{
                 isAuthenticated,
+                username,
                 login,
                 register,
                 logout
@@ -61,12 +70,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 };
 
 export const useAuth = () => {
-
     const context = useContext(AuthContext);
-
     if (!context) {
-        throw new Error("useAuth must be used within AuthProvider");
+        throw new Error("useAuth must be used within an AuthProvider");
     }
-
     return context;
 };

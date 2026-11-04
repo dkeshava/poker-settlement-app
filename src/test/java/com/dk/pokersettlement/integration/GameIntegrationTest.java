@@ -296,4 +296,59 @@ class GameIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.gameStatus").value("RUNNING"))
                 .andExpect(jsonPath("$.roundActive").value(true));
     }
+
+    @Test
+    void managerCanCreateGameWithName() throws Exception {
+        String payload = """
+                {
+                    "name": "Friday Night High Stakes",
+                    "chipConversionRate": 2.5
+                }
+                """;
+
+        String response = mockMvc.perform(post("/games")
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Friday Night High Stakes"))
+                .andExpect(jsonPath("$.chipConversionRate").value(2.5))
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void managerCanDeleteOpenGame() throws Exception {
+        String gameId = createGame(managerToken);
+
+        mockMvc.perform(delete("/games/" + gameId)
+                        .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/games/" + gameId)
+                        .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void managerCanAddParticipantByUsernameAndSearchUsers() throws Exception {
+        String gameId = createGame(managerToken);
+
+        String participantUsername = uniqueUsername();
+        registerUser(participantUsername, "StrongPassword123!");
+
+        // Search user
+        mockMvc.perform(get("/users/search?query=" + participantUsername)
+                        .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value(participantUsername));
+
+        // Add participant by username
+        String addPayload = String.format("{\"username\":\"%s\"}", participantUsername);
+        mockMvc.perform(post("/games/" + gameId + "/participants")
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(addPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value(participantUsername));
+    }
 }

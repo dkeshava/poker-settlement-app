@@ -40,6 +40,7 @@ public class GameController {
         GameResponse gameResponse = new GameResponse();
 
         gameResponse.setId(game.getId());
+        gameResponse.setName(game.getName() != null && !game.getName().isBlank() ? game.getName() : "Poker Session #" + game.getId());
         gameResponse.setGameStatus(game.getGameStatus());
         gameResponse.setChipConversionRate(game.getChipConversionRate());
         gameResponse.setRoundActive(game.isRoundActive());
@@ -96,6 +97,14 @@ public class GameController {
         GameResponse gameResponse = toGameResponse(game);
 
         return new ResponseEntity<>(gameResponse, HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{gameId}")
+    public ResponseEntity<Void> deleteGame(
+            @PathVariable Long gameId) throws AccessDeniedException {
+
+        gameService.deleteGame(gameId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{gameId}/start")

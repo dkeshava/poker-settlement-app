@@ -1,29 +1,572 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import * as api from "../api/gameApi";
-import ConfirmDialog from "../components/ConfirmDialog";
 import Navbar from "../components/Navbar";
 import StatusBadge from "../components/StatusBadge";
-import type { Game, Participant, Settlement, SettlementPreview } from "../types/game";
+import ConfirmDialog from "../components/ConfirmDialog";
+import UserAutocomplete from "../components/UserAutocomplete";
+import BuyInModal from "../components/BuyInModal";
+import ParticipantCard from "../components/ParticipantCard";
+import FinalChipEntry from "../components/FinalChipEntry";
+import SettlementSection from "../components/SettlementSection";
+import {
+  PlayIcon,
+  PauseIcon,
+  FlagIcon,
+  TrashIcon,
+  UsersIcon,
+  ShieldIcon,
+  CheckCircleIcon,
+  AlertCircleIcon,
+} from "../components/Icons";
+import type { Game, Participant, BuyIn, SettlementPreview, Settlement } from "../types/game";
 import { errorMessage } from "../utils/errors";
+import { formatCurrency, formatChips } from "../utils/formatters";
 
-const rupees = (value: number | string) => `₹${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 export default function GameDetails() {
-  const { gameId = "" } = useParams(); const [game, setGame] = useState<Game>(); const [people, setPeople] = useState<Participant[]>([]); const [preview, setPreview] = useState<SettlementPreview>(); const [settlement, setSettlement] = useState<Settlement>(); const [error, setError] = useState(""); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [userId, setUserId] = useState(""); const [amounts, setAmounts] = useState<Record<number, string>>({}); const [finals, setFinals] = useState<Record<number, string>>({}); const [confirmation, setConfirmation] = useState<{ title: string; message: string; action: () => Promise<unknown> }>();
-  const reload = useCallback(async () => { setLoading(true); try { const [g, p] = await Promise.all([api.getGame(gameId), api.getParticipants(gameId)]); setGame(g); setPeople(p); setFinals(Object.fromEntries(p.map(x => [x.participantId, x.finalChipValue?.toString() ?? ""]))); if (g.gameStatus === "ENDED") setPreview(await api.getPreview(gameId)); else if (g.gameStatus === "SETTLED") setSettlement(await api.getSettlement(gameId)); else { setPreview(undefined); setSettlement(undefined); } } catch (e) { setError(errorMessage(e)); } finally { setLoading(false); } }, [gameId]);
-  useEffect(() => { void reload(); }, [reload]);
-  const run = async (action: () => Promise<unknown>) => { setBusy(true); setError(""); try { await action(); await reload(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); } };
-  const editable = Boolean(game?.manager && (game.gameStatus === "OPEN" || (game.gameStatus === "RUNNING" && !game.roundActive)));
-  const totalBuy = useMemo(() => people.reduce((a,p) => a + p.buyIns.reduce((b,x) => b+x.chipValue,0),0), [people]); const totalFinal = Object.values(finals).reduce((a,v) => a + (v === "" ? 0 : Number(v)),0);
-  const addPerson = (e: FormEvent) => { e.preventDefault(); if (!Number.isInteger(Number(userId)) || Number(userId) < 1) return setError("Enter a valid numeric user ID."); void run(() => api.addParticipant(gameId, Number(userId))); setUserId(""); };
-  const addBuy = (participantId: number) => { const value = Number(amounts[participantId]); if (!Number.isInteger(value) || value < 1) return setError("A buy-in must be a positive whole number."); void run(() => api.addBuyIn(gameId, participantId, value)); setAmounts(v => ({...v,[participantId]:""})); };
-  const saveFinals = () => { const values = people.map(p => ({ participantId: p.participantId, chipValue: Number(finals[p.participantId]) })); if (values.some(v => !Number.isInteger(v.chipValue) || v.chipValue < 0)) return setError("Enter a final chip value for everyone; zero is valid."); void run(() => api.saveFinalChips(gameId, values)); };
-  const ask = (title: string, message: string, action: () => Promise<unknown>) => setConfirmation({title,message,action});
-  if (loading) return <><Navbar/><main className="page"><p className="loading">Loading game…</p></main></>; if (!game) return <><Navbar/><main className="page"><div className="alert error">{error || "Game unavailable."}</div></main></>;
-  const transfers = preview?.transfers ?? settlement?.transfers;
-  return <><Navbar/><main className="page"><Link className="back" to="/dashboard">← Dashboard</Link><div className="game-title"><div><p className="eyebrow">GAME #{game.id}</p><h1>{game.createdByUsername}’s session</h1><p>{rupees(game.chipConversionRate)} per chip · You are {game.manager ? "the manager" : "a participant"}</p></div><StatusBadge status={game.gameStatus}/></div>{error && <div className="alert error">{error}</div>}
-    <section className="panel lifecycle"><div><h2>Game lifecycle</h2><p>{game.gameStatus === "SETTLED" ? "Settlement is finalized and all ledger data is read-only." : game.gameStatus === "RUNNING" && game.roundActive ? "Round active — changes are locked." : "Backend lifecycle rules determine available actions."}</p></div>{game.manager && <div className="actions">{game.gameStatus === "OPEN" && <button className="button" disabled={busy} onClick={() => ask("Start game?", "Every participant must have a buy-in.", () => api.startGame(gameId))}>Start game</button>}{game.gameStatus === "RUNNING" && <><button className="button secondary" disabled={busy} onClick={() => void run(() => api.updateRoundState(gameId, !game.roundActive))}>{game.roundActive ? "End round" : "Start round"}</button>{!game.roundActive && <button className="button danger" disabled={busy} onClick={() => ask("End game?", "You will then enter final chips for every player.", () => api.endGame(gameId))}>End game</button>}</>}</div>}</section>
-    <section className="section"><h2>Participants & buy-ins</h2><p>{editable ? "Add players and record each buy-in separately." : "Individual buy-ins are shown read-only."}</p>{editable && <form className="inline-form" onSubmit={addPerson}><label>Add by user ID<input value={userId} onChange={e => setUserId(e.target.value)} inputMode="numeric" required/></label><button className="button" disabled={busy}>Add participant</button></form>}<div className="participant-list">{people.map(p => <article className="participant" key={p.participantId}><div className="participant-head"><div><h3>{p.username}</h3><small>Total: <strong>{p.buyIns.reduce((s,b) => s+b.chipValue,0)} chips</strong></small></div>{editable && <button className="text-button danger-text" onClick={() => ask(`Remove ${p.username}?`, "This only works when no buy-ins exist.", () => api.removeParticipant(gameId,p.participantId))}>Remove</button>}</div><div className="buyins">{p.buyIns.length ? p.buyIns.map(b => <span className="buyin" key={b.buyInId}>{b.chipValue} chips {editable && <><button onClick={() => { const val=window.prompt("New chip value",String(b.chipValue)); if (val && Number(val)>0) void run(() => api.updateBuyIn(gameId,b.buyInId,Number(val))); }}>Edit</button><button onClick={() => ask("Delete buy-in?", "This removes this entry from the ledger.", () => api.deleteBuyIn(gameId,b.buyInId))}>×</button></>}</span>) : <small>No buy-ins recorded.</small>}</div>{editable && <div className="inline-form compact"><label>Add buy-in<input type="number" min="1" value={amounts[p.participantId] ?? ""} onChange={e => setAmounts(v => ({...v,[p.participantId]:e.target.value}))}/></label><button type="button" className="button secondary" onClick={() => addBuy(p.participantId)}>Add</button></div>}</article>)}</div></section>
-    {game.gameStatus === "ENDED" && <section className="section"><div className="section-head"><div><h2>Final chip values</h2><p>Buy-ins: {totalBuy} chips · Finals: {totalFinal} chips {totalBuy === totalFinal ? "✓ balanced" : "(must match)"}</p></div>{game.manager && <button className="button" onClick={saveFinals} disabled={busy}>Save final chips</button>}</div><div className="final-grid">{people.map(p => <label key={p.participantId}>{p.username}<small>Buy-ins: {p.buyIns.reduce((s,b)=>s+b.chipValue,0)}</small>{game.manager ? <input type="number" min="0" value={finals[p.participantId] ?? ""} onChange={e => setFinals(v=>({...v,[p.participantId]:e.target.value}))}/> : <strong>{p.finalChipValue ?? "Not entered"} chips</strong>}</label>)}</div></section>}
-    {transfers && <section className="section"><div className="section-head"><div><h2>{settlement ? "Finalized settlement" : "Settlement preview"}</h2><p>{settlement ? "Stored transfers are read-only." : "Minimum transfers calculated by the backend."}</p></div>{preview && game.manager && <button className="button danger" disabled={busy} onClick={() => ask("Finalize settlement?", "This stores the exact plan and makes the game read-only.", () => api.finalizeSettlement(gameId))}>Finalize settlement</button>}</div>{preview && <div className="table-wrap"><table><thead><tr><th>Player</th><th>Buy-ins</th><th>Final</th><th>Net chips</th><th>Net money</th></tr></thead><tbody>{preview.netBalances.map(n => <tr key={n.participantId}><td>{n.username}</td><td>{n.totalBuyInChips}</td><td>{n.finalChipValue}</td><td>{n.netChipValue}</td><td>{rupees(n.netAmount)}</td></tr>)}</tbody></table></div>}<h3>Transfers</h3>{transfers.length ? <div className="transfers">{transfers.map((t,i) => <div key={i}><strong>{t.fromUsername}</strong> pays <strong>{t.toUsername}</strong><b>{rupees(t.amount)}</b></div>)}</div> : <div className="empty-state">No transfers required.</div>}</section>}</main>{confirmation && <ConfirmDialog title={confirmation.title} message={confirmation.message} busy={busy} onCancel={() => setConfirmation(undefined)} onConfirm={() => void run(confirmation.action).then(() => setConfirmation(undefined))}/>}</>;
+  const { gameId = "" } = useParams();
+  const navigate = useNavigate();
+
+  const [game, setGame] = useState<Game>();
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [preview, setPreview] = useState<SettlementPreview | undefined>();
+  const [settlement, setSettlement] = useState<Settlement | undefined>();
+
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [successBanner, setSuccessBanner] = useState("");
+
+  // Buy-in modal state
+  const [activeBuyInModal, setActiveBuyInModal] = useState<{
+    participant: Participant;
+    buyIn?: BuyIn;
+  } | null>(null);
+
+  // Confirmation dialog state
+  const [confirmation, setConfirmation] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    confirmVariant?: "primary" | "danger" | "warning";
+    action: () => Promise<unknown>;
+  } | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [fetchedGame, fetchedParticipants] = await Promise.all([
+        api.getGame(gameId),
+        api.getParticipants(gameId),
+      ]);
+
+      setGame(fetchedGame);
+      setParticipants(fetchedParticipants);
+
+      if (fetchedGame.gameStatus === "ENDED") {
+        setSettlement(undefined);
+        // Only fetch preview if all participants have final chips entered
+        const allHaveFinals =
+          fetchedParticipants.length >= 2 &&
+          fetchedParticipants.every(
+            (p) => p.finalChipValue !== null && p.finalChipValue !== undefined
+          );
+        if (allHaveFinals) {
+          try {
+            const prev = await api.getPreview(gameId);
+            setPreview(prev);
+          } catch {
+            setPreview(undefined);
+          }
+        } else {
+          setPreview(undefined);
+        }
+      } else if (fetchedGame.gameStatus === "SETTLED") {
+        // Crucial fix: Clear preview completely when game is SETTLED
+        setPreview(undefined);
+        const settled = await api.getSettlement(gameId);
+        setSettlement(settled);
+      } else {
+        setPreview(undefined);
+        setSettlement(undefined);
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const executeAction = async (action: () => Promise<unknown>, successMsg?: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      if (successMsg) {
+        setSuccessBanner(successMsg);
+        setTimeout(() => setSuccessBanner(""), 4000);
+      }
+      await reload();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isManager = Boolean(game?.manager);
+  const canModifyBuyIns = Boolean(
+    isManager &&
+      (game?.gameStatus === "OPEN" ||
+        (game?.gameStatus === "RUNNING" && !game.roundActive))
+  );
+  const canRemoveParticipant = Boolean(
+    isManager &&
+      (game?.gameStatus === "OPEN" ||
+        (game?.gameStatus === "RUNNING" && !game.roundActive))
+  );
+
+  // Pot and chips calculations
+  const totalBuyInChips = useMemo(
+    () =>
+      participants.reduce(
+        (sum, p) => sum + p.buyIns.reduce((bSum, b) => bSum + b.chipValue, 0),
+        0
+      ),
+    [participants]
+  );
+
+  const rate = Number(game?.chipConversionRate) || 1;
+  const totalPotMoney = totalBuyInChips * rate;
+
+  // Participant actions
+  const handleAddParticipant = (data: { userId?: number; username?: string }) => {
+    void executeAction(
+      () => api.addParticipant(gameId, data),
+      `Player added successfully to the session!`
+    );
+  };
+
+  const handleRemoveParticipant = (p: Participant) => {
+    setConfirmation({
+      title: `Remove ${p.username}?`,
+      message: `Are you sure you want to remove ${p.username} from this poker session? This is only allowed when no buy-ins have been recorded for them.`,
+      confirmLabel: "Remove Player",
+      confirmVariant: "danger",
+      action: () => api.removeParticipant(gameId, p.participantId),
+    });
+  };
+
+  // Buy-in actions
+  const handleSaveBuyIn = (chipValue: number) => {
+    if (!activeBuyInModal) return;
+    const { participant, buyIn } = activeBuyInModal;
+
+    if (buyIn) {
+      // Edit buy-in
+      void executeAction(
+        () => api.updateBuyIn(gameId, buyIn.buyInId, chipValue),
+        `Buy-in updated to ${chipValue} chips for ${participant.username}.`
+      );
+    } else {
+      // Add buy-in
+      void executeAction(
+        () => api.addBuyIn(gameId, participant.participantId, chipValue),
+        `Recorded buy-in of ${chipValue} chips for ${participant.username}.`
+      );
+    }
+    setActiveBuyInModal(null);
+  };
+
+  const handleDeleteBuyIn = (p: Participant, buyIn: BuyIn) => {
+    setConfirmation({
+      title: "Delete Buy-In?",
+      message: `Delete the buy-in of ${buyIn.chipValue} chips for ${p.username}? This will remove it from the session ledger.`,
+      confirmLabel: "Delete Buy-In",
+      confirmVariant: "danger",
+      action: () => api.deleteBuyIn(gameId, buyIn.buyInId),
+    });
+  };
+
+  // Lifecycle transitions
+  const handleStartGame = () => {
+    if (participants.length < 2) {
+      setError("At least 2 players are required to start the poker session.");
+      return;
+    }
+    const missingBuyIn = participants.find((p) => p.buyIns.length === 0);
+    if (missingBuyIn) {
+      setError(
+        `Every player must have at least one buy-in. Please record a buy-in for ${missingBuyIn.username}.`
+      );
+      return;
+    }
+
+    setConfirmation({
+      title: "Start Poker Game?",
+      message:
+        "Starting the game locks initial buy-ins and starts the first active round. You can pause rounds between hands to add rebuys.",
+      confirmLabel: "Start Game",
+      confirmVariant: "primary",
+      action: () => api.startGame(gameId),
+    });
+  };
+
+  const handleToggleRound = () => {
+    if (!game) return;
+    const nextState = !game.roundActive;
+    void executeAction(
+      () => api.updateRoundState(gameId, nextState),
+      nextState
+        ? "Round started! Buy-in modifications are locked during play."
+        : "Round paused! You can now record re-buys or end the game."
+    );
+  };
+
+  const handleEndGame = () => {
+    setConfirmation({
+      title: "End Poker Game?",
+      message:
+        "Ending the game stops play permanently and prompts you to enter final chip counts for all players to settle up.",
+      confirmLabel: "End Game",
+      confirmVariant: "warning",
+      action: () => api.endGame(gameId),
+    });
+  };
+
+  const handleDeleteGame = () => {
+    setConfirmation({
+      title: "Delete This Game?",
+      message:
+        "Are you sure you want to delete this game session? All players and buy-ins will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete Game",
+      confirmVariant: "danger",
+      action: async () => {
+        await api.deleteGame(gameId);
+        navigate("/dashboard");
+      },
+    });
+  };
+
+  // Final chips saving
+  const handleSaveFinalChips = (values: { participantId: number; chipValue: number }[]) => {
+    void executeAction(
+      () => api.saveFinalChips(gameId, values),
+      "Final chip counts saved! Settlement preview calculated."
+    );
+  };
+
+  // Finalize settlement (Fixed bug: updates state cleanly without getting stuck)
+  const handleFinalizeSettlement = () => {
+    setConfirmation({
+      title: "Finalize & Lock Settlement?",
+      message:
+        "This will lock all ledger transactions permanently. The settlement will become completely read-only and cannot be changed.",
+      confirmLabel: "Finalize Settlement",
+      confirmVariant: "danger",
+      action: async () => {
+        const settledData = await api.finalizeSettlement(gameId);
+        // Clear preview immediately to avoid stuck UI bug
+        setPreview(undefined);
+        setSettlement(settledData);
+        setGame((prev) => (prev ? { ...prev, gameStatus: "SETTLED" } : undefined));
+      },
+    });
+  };
+
+  if (loading && !game) {
+    return (
+      <div className="app-layout">
+        <Navbar />
+        <main className="page-container">
+          <div className="loading-state">
+            <div className="spinner" />
+            <p>Loading poker session #{gameId}…</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!game) {
+    return (
+      <div className="app-layout">
+        <Navbar />
+        <main className="page-container">
+          <div className="alert alert-error">
+            <span>{error || "Poker game session not found."}</span>
+          </div>
+          <Link to="/dashboard" className="btn btn-primary">
+            ← Back to Dashboard
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-layout">
+      <Navbar />
+
+      <main className="page-container">
+        {/* Navigation Breadcrumb */}
+        <div className="breadcrumb-row">
+          <Link to="/dashboard" className="breadcrumb-link">
+            ← Back to Dashboard
+          </Link>
+        </div>
+
+        {/* Game Title & Header Banner */}
+        <div className="game-header-card">
+          <div className="game-header-info">
+            <div className="game-meta-eyebrow">
+              <span className="game-id-tag">SESSION #{game.id}</span>
+              <span className="rate-badge">🪙 1 Chip = {formatCurrency(game.chipConversionRate)}</span>
+              {game.manager && (
+                <span className="manager-badge">
+                  <ShieldIcon size={12} /> You are Game Manager
+                </span>
+              )}
+            </div>
+
+            <h1 className="game-main-title">
+              {game.name || `${game.createdByUsername}’s Poker Session`}
+            </h1>
+
+            <p className="game-sub-info">
+              Host: <strong>@{game.createdByUsername}</strong> • Table Status:{" "}
+              <strong>{game.gameStatus}</strong>
+              {game.gameStatus === "RUNNING" && (
+                <span> ({game.roundActive ? "Round in Progress" : "Between Rounds"})</span>
+              )}
+            </p>
+          </div>
+
+          <div className="game-header-status-side">
+            <StatusBadge status={game.gameStatus} roundActive={game.roundActive} />
+
+            {/* Quick stats in header */}
+            <div className="header-chips-pot">
+              <div className="header-pot-item">
+                <span className="pot-label">Total Table Chips</span>
+                <span className="pot-value font-mono">🪙 {formatChips(totalBuyInChips)}</span>
+              </div>
+              <div className="header-pot-item">
+                <span className="pot-label">Total Pot Value</span>
+                <span className="pot-value font-mono text-emerald">{formatCurrency(totalPotMoney)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Alerts & Notifications */}
+        {error && (
+          <div className="alert alert-error">
+            <AlertCircleIcon size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {successBanner && (
+          <div className="alert alert-success">
+            <CheckCircleIcon size={18} />
+            <span>{successBanner}</span>
+          </div>
+        )}
+
+        {/* Step Guide / Lifecycle Banner */}
+        <div className="lifecycle-panel">
+          <div className="lifecycle-instructions">
+            <h3 className="lifecycle-title">
+              {game.gameStatus === "OPEN" && "1. Registration & Initial Buy-Ins"}
+              {game.gameStatus === "RUNNING" && (game.roundActive ? "2. Active Round Playing" : "2. Round Paused (Re-buys Allowed)")}
+              {game.gameStatus === "ENDED" && "3. Enter Final Chip Counts"}
+              {game.gameStatus === "SETTLED" && "4. Settlement Finalized & Complete"}
+            </h3>
+            <p className="lifecycle-desc">
+              {game.gameStatus === "OPEN" &&
+                "Add players by username or ID and record each player's initial buy-in. When everyone is seated, click 'Start Game'."}
+              {game.gameStatus === "RUNNING" &&
+                (game.roundActive
+                  ? "Gameplay is in progress. Buy-in edits are locked during a hand. Pause the round when players need to re-buy."
+                  : "Round is paused between hands. You can add re-buys for players, resume the next round, or end the game session.")}
+              {game.gameStatus === "ENDED" &&
+                "The game has ended. Count all chips on the table and enter each player's final chips below. When balanced, review the preview and finalize!"}
+              {game.gameStatus === "SETTLED" &&
+                "Settlement is officially finalized! Review the minimum peer-to-peer transfers below and copy them to your group chat."}
+            </p>
+          </div>
+
+          {/* Manager Action Toolbar */}
+          {isManager && (
+            <div className="lifecycle-toolbar">
+              {game.gameStatus === "OPEN" && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={busy || participants.length < 2}
+                    onClick={handleStartGame}
+                  >
+                    <PlayIcon size={16} />
+                    <span>Start Game</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost text-rose"
+                    disabled={busy}
+                    onClick={handleDeleteGame}
+                  >
+                    <TrashIcon size={16} />
+                    <span>Delete Session</span>
+                  </button>
+                </>
+              )}
+
+              {game.gameStatus === "RUNNING" && (
+                <>
+                  <button
+                    type="button"
+                    className={`btn ${game.roundActive ? "btn-warning" : "btn-primary"}`}
+                    disabled={busy}
+                    onClick={handleToggleRound}
+                  >
+                    {game.roundActive ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+                    <span>{game.roundActive ? "Pause Round (Allow Rebuys)" : "Resume Round"}</span>
+                  </button>
+
+                  {!game.roundActive && (
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={busy}
+                      onClick={handleEndGame}
+                    >
+                      <FlagIcon size={16} />
+                      <span>End Game Session</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Section: Players & Buy-Ins */}
+        <section className="dashboard-section participants-section">
+          <div className="section-header">
+            <div>
+              <h2 className="section-title">
+                Players & Table Buy-Ins ({participants.length})
+              </h2>
+              <p className="section-sub">
+                {canModifyBuyIns
+                  ? "Add players to the table and record buy-ins or re-buys."
+                  : "All recorded buy-ins are displayed below (modifications locked)."}
+              </p>
+            </div>
+          </div>
+
+          {/* Add Participant Autocomplete Search (Manager only when allowed) */}
+          {canModifyBuyIns && (
+            <div className="add-player-box">
+              <span className="add-player-title">Add Player to Session:</span>
+              <UserAutocomplete
+                onSelect={handleAddParticipant}
+                busy={busy}
+                disabled={!canModifyBuyIns}
+              />
+            </div>
+          )}
+
+          {/* Participants Cards Grid */}
+          {participants.length > 0 ? (
+            <div className="participants-grid">
+              {participants.map((p) => (
+                <ParticipantCard
+                  key={p.participantId}
+                  participant={p}
+                  chipConversionRate={game.chipConversionRate}
+                  isManager={isManager}
+                  canModifyBuyIns={canModifyBuyIns}
+                  canRemoveParticipant={canRemoveParticipant}
+                  onOpenAddBuyIn={(player) => setActiveBuyInModal({ participant: player })}
+                  onEditBuyIn={(player, b) => setActiveBuyInModal({ participant: player, buyIn: b })}
+                  onDeleteBuyIn={handleDeleteBuyIn}
+                  onRemoveParticipant={handleRemoveParticipant}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-players-box">
+              <UsersIcon size={36} className="text-gray" />
+              <h3>No Players at the Table Yet</h3>
+              <p>
+                Use the search box above to add friends by their username or numeric ID. At least 2 players with buy-ins are required to start.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Section: Final Chip Counts (when ENDED or SETTLED) */}
+        {game.gameStatus === "ENDED" && (
+          <FinalChipEntry
+            participants={participants}
+            chipConversionRate={game.chipConversionRate}
+            isManager={isManager}
+            busy={busy}
+            onSave={handleSaveFinalChips}
+          />
+        )}
+
+        {/* Section: Settlement & Transfers (when preview available or settled) */}
+        {(preview || settlement) && (
+          <SettlementSection
+            preview={preview}
+            settlement={settlement}
+            isSettled={game.gameStatus === "SETTLED"}
+            isManager={isManager}
+            busy={busy}
+            onFinalize={handleFinalizeSettlement}
+          />
+        )}
+      </main>
+
+      {/* Buy-In Modal */}
+      {activeBuyInModal && (
+        <BuyInModal
+          participantName={activeBuyInModal.participant.username}
+          chipConversionRate={game.chipConversionRate}
+          initialValue={activeBuyInModal.buyIn?.chipValue}
+          isEdit={Boolean(activeBuyInModal.buyIn)}
+          busy={busy}
+          onSave={handleSaveBuyIn}
+          onClose={() => setActiveBuyInModal(null)}
+        />
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirmation && (
+        <ConfirmDialog
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmLabel={confirmation.confirmLabel}
+          confirmVariant={confirmation.confirmVariant}
+          busy={busy}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => {
+            const action = confirmation.action;
+            setConfirmation(null);
+            void executeAction(action);
+          }}
+        />
+      )}
+    </div>
+  );
 }

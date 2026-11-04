@@ -15,6 +15,7 @@ export interface RegisterRequest {
 
 export interface AuthContextType {
     isAuthenticated: boolean;
+    username: string | null;
     login: (credentials: LoginRequest) => Promise<void>;
     register: (details: RegisterRequest) => Promise<User>;
     logout: () => void;

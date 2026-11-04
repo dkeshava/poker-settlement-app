@@ -91,9 +91,19 @@ public class ParticipantService {
         }
 
         // 4. Find the user to add
-        User user = userRepo.findById(request.getUserId())
-                .orElseThrow(() ->
-                        new EntityNotFoundException("User not found"));
+        User user;
+        if (request.getUserId() != null) {
+            user = userRepo.findById(request.getUserId())
+                    .orElseThrow(() ->
+                            new EntityNotFoundException("User not found with ID: " + request.getUserId()));
+        } else if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            user = userRepo.findByUsernameIgnoreCase(request.getUsername().trim())
+                    .or(() -> userRepo.findOptionalByUsername(request.getUsername().trim()))
+                    .orElseThrow(() ->
+                            new EntityNotFoundException("User not found with username: " + request.getUsername()));
+        } else {
+            throw new IllegalArgumentException("Either userId or username must be provided");
+        }
 
         // 5. Prevent duplicate participation
         if (gameParticipantRepo.existsByGame_IdAndUser_Id(

@@ -10,6 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 //import java.nio.file.AccessDeniedException;
 
 @RestController
+@CrossOrigin
 @RequestMapping("/games/{gameId}")
 @RequiredArgsConstructor
 public class SettlementController {

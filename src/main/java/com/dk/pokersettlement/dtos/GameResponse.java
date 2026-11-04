@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 @Data
 public class GameResponse {
     private Long id;
+    private String name;
     private Long createdById;
     private String createdByUsername;
     private GameState gameStatus;

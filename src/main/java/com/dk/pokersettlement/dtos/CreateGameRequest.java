@@ -10,5 +10,10 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @Data
 public class CreateGameRequest {
+    private String name;
     private BigDecimal chipConversionRate;
+
+    public CreateGameRequest(BigDecimal chipConversionRate) {
+        this.chipConversionRate = chipConversionRate;
+    }
 }

@@ -157,7 +157,7 @@ class BuyInServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(
-                EntityNotFoundException.class,
+                ResourceNotFoundException.class,
                 () -> buyInService.addBuyIn(
                         GAME_ID, PARTICIPANT_ID,
                         new CreateBuyInRequest(100L))
@@ -232,7 +232,7 @@ class BuyInServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(
-                EntityNotFoundException.class,
+                ResourceNotFoundException.class,
                 () -> buyInService.updateBuyIn(
                         GAME_ID, BUYIN_ID,
                         new UpdateBuyInRequest(200L))

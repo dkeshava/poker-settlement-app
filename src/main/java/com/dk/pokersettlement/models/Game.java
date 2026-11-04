@@ -18,6 +18,8 @@ public class Game {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    @Column(nullable = true)
+    private String name;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "created_by_id", nullable = false)
