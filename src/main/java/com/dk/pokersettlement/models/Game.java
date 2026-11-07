@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 @Table(name = "games")
 public class Game {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = true)
@@ -31,4 +31,7 @@ public class Game {
     private BigDecimal chipConversionRate;
     @Column(nullable = false)
     private boolean roundActive;
+
+    @Version
+    private Long version;
 }

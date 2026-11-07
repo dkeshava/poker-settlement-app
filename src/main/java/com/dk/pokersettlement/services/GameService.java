@@ -14,6 +14,7 @@ import com.dk.pokersettlement.repositories.GameRepo;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -24,6 +25,7 @@ import java.util.Comparator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class GameService {
     private GameRepo gameRepo;
@@ -82,7 +84,7 @@ public class GameService {
         Long currentUserId = currentUserService.getCurrentUser().getId();
 
         if (!isManagerOrParticipant(currentUserId,gameId)) {
-            System.out.println("THROWING ACCESS DENIED");
+            log.warn("Access denied: user {} cannot access game {}", currentUserId, gameId);
             throw new AccessDeniedException("You cannot access this game");
         }
 

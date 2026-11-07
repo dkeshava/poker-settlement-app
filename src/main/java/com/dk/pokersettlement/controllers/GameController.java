@@ -13,11 +13,13 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.security.access.AccessDeniedException;
 import java.util.List;
 
+@Slf4j
 @RestController
 @CrossOrigin
 @RequestMapping("/games")
@@ -87,12 +89,8 @@ public class GameController {
     public ResponseEntity<GameResponse> createGame(
             @Valid @RequestBody CreateGameRequest gameRequest) {
 
-        System.out.println("Entered GameController");
-        System.out.println("Calling GameService");
-
         Game game = gameService.createGame(gameRequest);
-
-        System.out.println("Game created successfully");
+        log.info("Created game id={} name='{}'", game.getId(), game.getName());
 
         GameResponse gameResponse = toGameResponse(game);
 

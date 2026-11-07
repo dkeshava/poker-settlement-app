@@ -3,6 +3,7 @@ package com.dk.pokersettlement.services;
 import com.dk.pokersettlement.dtos.UserResponse;
 import com.dk.pokersettlement.models.User;
 import com.dk.pokersettlement.repositories.UserRepo;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class UserService {
     @Autowired
@@ -25,14 +27,15 @@ public class UserService {
     private JWTService jwtService;
 
     public User addUser(User user) {
+        log.info("Registering new user: {}", user.getUsername());
         user.setPassword(encoder.encode(user.getPassword()));
         return userRepo.save(user);
     }
 
     public String verify(User user) {
-        System.out.println("verifying user");
-        System.out.println("Username: " + user.getUsername());
-        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
+        log.debug("Authenticating user: {}", user.getUsername());
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
         if (authentication.isAuthenticated()) {
             return jwtService.generateToken(user.getUsername());
         }

@@ -1,9 +1,12 @@
 package com.dk.pokersettlement.exceptions;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.ErrorResponse;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -74,10 +78,24 @@ public class GlobalExceptionHandler {
             BusinessException ex,
             HttpServletRequest request) {
 
-        System.out.println("BUSINESS EXCEPTION HANDLER CALLED");
+        log.warn("Business rule violation at {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(
                 HttpStatus.BAD_REQUEST,
                 ex.getMessage(),
+                request
+        );
+    }
+
+    // Concurrent modification conflict -> 409
+    @ExceptionHandler({OptimisticLockException.class, ObjectOptimisticLockingFailureException.class})
+    public ResponseEntity<ApiErrorResponse> handleOptimisticLocking(
+            Exception ex,
+            HttpServletRequest request) {
+
+        log.warn("Concurrent modification detected at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "The game state was modified by another concurrent request. Please refresh and try again.",
                 request
         );
     }
@@ -105,7 +123,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(
             AccessDeniedException ex,
             HttpServletRequest request) {
-        System.out.println("ACCESS DENIED HANDLER CALLED");
+        log.warn("Access denied at {}: {}", request.getRequestURI(), ex.getMessage());
 
         return buildResponse(
                 HttpStatus.FORBIDDEN,
@@ -120,9 +138,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        // Log the actual exception for debugging.
-        // Do not expose internal exception details to API consumers.
-        ex.printStackTrace();
+        log.error("Unhandled exception at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
 
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,

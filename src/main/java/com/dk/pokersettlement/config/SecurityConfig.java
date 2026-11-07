@@ -17,18 +17,23 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.config.Customizer;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    @Value("${cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
+    private String allowedOrigins;
 
     private final MyUserDetailsService userDetailsService;
     private final JwtFilter jwtFilter;
@@ -44,11 +49,15 @@ public class SecurityConfig {
         http.csrf(customizer -> customizer.disable());
 
         http.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-                .requestMatchers("/register", "/login"
-                        ,"/swagger-ui/**",
+                .requestMatchers(
+                        "/register",
+                        "/login",
+                        "/swagger-ui/**",
                         "/v3/api-docs/**",
-                        "/swagger-ui.html"
-                        ).permitAll()
+                        "/swagger-ui.html",
+                        "/actuator/health",
+                        "/actuator/info"
+                ).permitAll()
                 .anyRequest().authenticated()
         );
 
@@ -98,9 +107,12 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(
-                List.of("http://localhost:*", "http://127.0.0.1:*")
-        );
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        configuration.setAllowedOriginPatterns(origins);
 
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")

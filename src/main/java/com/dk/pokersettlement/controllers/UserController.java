@@ -29,10 +29,9 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody User user) {
-        System.out.println("getting verification");
-        String verification=userDetailsService.verify(user);
+        String verification = userDetailsService.verify(user);
 
-        if (verification!=null) {
+        if (verification != null) {
             return ResponseEntity.ok(verification);
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
