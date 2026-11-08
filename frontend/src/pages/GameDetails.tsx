@@ -11,13 +11,13 @@ import FinalChipEntry from "../components/FinalChipEntry";
 import SettlementSection from "../components/SettlementSection";
 import {
   PlayIcon,
-  PauseIcon,
   FlagIcon,
   TrashIcon,
   UsersIcon,
   ShieldIcon,
   CheckCircleIcon,
   AlertCircleIcon,
+  ClockIcon,
 } from "../components/Icons";
 import type { Game, Participant, BuyIn, SettlementPreview, Settlement } from "../types/game";
 import { errorMessage } from "../utils/errors";
@@ -208,9 +208,9 @@ export default function GameDetails() {
     }
 
     setConfirmation({
-      title: "Start Poker Game?",
+      title: "Start Poker Session?",
       message:
-        "Starting the game locks initial buy-ins and starts the first active round. You can pause rounds between hands to add rebuys.",
+        "Starting the session locks initial buy-ins and starts Round 1. Once a round concludes, you can end the round to record re-buys or seat new players.",
       confirmLabel: "Start Game",
       confirmVariant: "primary",
       action: () => api.startGame(gameId),
@@ -223,18 +223,18 @@ export default function GameDetails() {
     void executeAction(
       () => api.updateRoundState(gameId, nextState),
       nextState
-        ? "Round started! Buy-in modifications are locked during play."
-        : "Round paused! You can now record re-buys or end the game."
+        ? "Next round started! Table buy-ins and seating are locked during active play."
+        : "Round ended! You can now record re-buys, seat new players, or end the session."
     );
   };
 
   const handleEndGame = () => {
     setConfirmation({
-      title: "End Poker Game?",
+      title: "End Entire Poker Session?",
       message:
-        "Ending the game stops play permanently and prompts you to enter final chip counts for all players to settle up.",
-      confirmLabel: "End Game",
-      confirmVariant: "warning",
+        "Ending the session concludes all play for the night. You will enter each player's final chip count to compute net balances and generate the minimum settlement transfers.",
+      confirmLabel: "End Session",
+      confirmVariant: "danger",
       action: () => api.endGame(gameId),
     });
   };
@@ -384,7 +384,7 @@ export default function GameDetails() {
           <div className="lifecycle-instructions">
             <h3 className="lifecycle-title">
               {game.gameStatus === "OPEN" && "1. Registration & Initial Buy-Ins"}
-              {game.gameStatus === "RUNNING" && (game.roundActive ? "2. Active Round Playing" : "2. Round Paused (Re-buys Allowed)")}
+              {game.gameStatus === "RUNNING" && (game.roundActive ? "2. Active Round Playing" : "2. Between Rounds (Re-buys Allowed)")}
               {game.gameStatus === "ENDED" && "3. Enter Final Chip Counts"}
               {game.gameStatus === "SETTLED" && "4. Settlement Finalized & Complete"}
             </h3>
@@ -393,8 +393,8 @@ export default function GameDetails() {
                 "Add players by username or ID and record each player's initial buy-in. When everyone is seated, click 'Start Game'."}
               {game.gameStatus === "RUNNING" &&
                 (game.roundActive
-                  ? "Gameplay is in progress. Buy-in edits are locked during a hand. Pause the round when players need to re-buy."
-                  : "Round is paused between hands. You can add re-buys for players, resume the next round, or end the game session.")}
+                  ? "Gameplay is in progress. Buy-in additions and new player seating are locked during an active round. When the hand concludes, click 'End Current Round' above to allow re-buys."
+                  : "Round concluded (between hands). You can now record re-buys for existing players, seat new players, start the next round, or end the poker session when finished.")}
               {game.gameStatus === "ENDED" &&
                 "The game has ended. Count all chips on the table and enter each player's final chips below. When balanced, review the preview and finalize!"}
               {game.gameStatus === "SETTLED" &&
@@ -437,8 +437,8 @@ export default function GameDetails() {
                     disabled={busy}
                     onClick={handleToggleRound}
                   >
-                    {game.roundActive ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
-                    <span>{game.roundActive ? "Pause Round (Allow Rebuys)" : "Resume Round"}</span>
+                    {game.roundActive ? <CheckCircleIcon size={16} /> : <PlayIcon size={16} />}
+                    <span>{game.roundActive ? "End Current Round" : "Start Next Round"}</span>
                   </button>
 
                   {!game.roundActive && (
@@ -449,7 +449,7 @@ export default function GameDetails() {
                       onClick={handleEndGame}
                     >
                       <FlagIcon size={16} />
-                      <span>End Game Session</span>
+                      <span>End Poker Session</span>
                     </button>
                   )}
                 </>
@@ -468,10 +468,20 @@ export default function GameDetails() {
               <p className="section-sub">
                 {canModifyBuyIns
                   ? "Add players to the table and record buy-ins or re-buys."
-                  : "All recorded buy-ins are displayed below (modifications locked)."}
+                  : "All recorded buy-ins are displayed below (modifications locked during active round)."}
               </p>
             </div>
           </div>
+
+          {/* Informative banner when round is active */}
+          {game.gameStatus === "RUNNING" && game.roundActive && (
+            <div className="alert alert-info round-lock-banner">
+              <ClockIcon size={16} />
+              <span>
+                A round is currently in progress. Table buy-ins and seating are locked during active play. Click <strong>End Current Round</strong> above once the hand finishes to record re-buys or seat new players.
+              </span>
+            </div>
+          )}
 
           {/* Add Participant Autocomplete Search (Manager only when allowed) */}
           {canModifyBuyIns && (

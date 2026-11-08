@@ -38,7 +38,7 @@ docker compose up --build
 
 ### 2. Run Backend
 ```bash
-# Run automated tests (106 unit & integration tests)
+# Run automated tests (107 unit & integration tests including Flyway validation)
 ./mvnw test
 
 # Start the Spring Boot application

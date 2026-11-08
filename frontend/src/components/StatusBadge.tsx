@@ -37,7 +37,7 @@ export default function StatusBadge({ status, roundActive }: StatusBadgeProps) {
       <span>{config.label}</span>
       {status === "RUNNING" && (
         <span className="status-round-tag">
-          {roundActive ? "• Round Active" : "• Paused"}
+          {roundActive ? "• Round Active" : "• Between Rounds"}
         </span>
       )}
     </span>

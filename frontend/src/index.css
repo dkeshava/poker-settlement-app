@@ -1796,6 +1796,15 @@ button, input {
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #a7f3d0;
 }
+.alert-info {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #bae6fd;
+}
+.round-lock-banner {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
 .btn-alert-action {
   margin-left: auto;
   background: transparent;
